@@ -9,12 +9,11 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Set
 
-import aiofiles
-
-from metagpt.utils.common import aread
+from metagpt.utils.common import aread, awrite
 from metagpt.utils.exceptions import handle_exception
 
 
@@ -36,14 +35,15 @@ class DependencyFile:
         """Load dependencies from the file asynchronously."""
         if not self._filename.exists():
             return
-        self._dependencies = json.loads(await aread(self._filename))
+        json_data = await aread(self._filename)
+        json_data = re.sub(r"\\+", "/", json_data)  # Compatible with windows path
+        self._dependencies = json.loads(json_data)
 
     @handle_exception
     async def save(self):
         """Save dependencies to the file asynchronously."""
         data = json.dumps(self._dependencies)
-        async with aiofiles.open(str(self._filename), mode="w") as writer:
-            await writer.write(data)
+        await awrite(filename=self._filename, data=data)
 
     async def update(self, filename: Path | str, dependencies: Set[Path | str], persist=True):
         """Update dependencies for a file asynchronously.
@@ -57,20 +57,22 @@ class DependencyFile:
 
         root = self._filename.parent
         try:
-            key = Path(filename).relative_to(root)
+            key = Path(filename).relative_to(root).as_posix()
         except ValueError:
             key = filename
-
+        key = str(key)
         if dependencies:
             relative_paths = []
             for i in dependencies:
                 try:
-                    relative_paths.append(str(Path(i).relative_to(root)))
+                    s = str(Path(i).relative_to(root).as_posix())
                 except ValueError:
-                    relative_paths.append(str(i))
-            self._dependencies[str(key)] = relative_paths
-        elif str(key) in self._dependencies:
-            del self._dependencies[str(key)]
+                    s = str(i)
+                relative_paths.append(s)
+
+            self._dependencies[key] = relative_paths
+        elif key in self._dependencies:
+            del self._dependencies[key]
 
         if persist:
             await self.save()
@@ -87,9 +89,9 @@ class DependencyFile:
 
         root = self._filename.parent
         try:
-            key = Path(filename).relative_to(root)
+            key = Path(filename).relative_to(root).as_posix()
         except ValueError:
-            key = filename
+            key = Path(filename).as_posix()
         return set(self._dependencies.get(str(key), {}))
 
     def delete_file(self):

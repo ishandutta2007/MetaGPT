@@ -40,7 +40,7 @@ class TutorialAssistant(Role):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._init_actions([WriteDirectory(language=self.language)])
+        self.set_actions([WriteDirectory(language=self.language)])
         self._set_react_mode(react_mode=RoleReactMode.BY_ORDER.value)
 
     async def _handle_directory(self, titles: Dict) -> Message:
@@ -56,14 +56,16 @@ class TutorialAssistant(Role):
         self.main_title = titles.get("title")
         directory = f"{self.main_title}\n"
         self.total_content += f"# {self.main_title}"
-        actions = list()
+        actions = list(self.actions)
         for first_dir in titles.get("directory"):
             actions.append(WriteContent(language=self.language, directory=first_dir))
             key = list(first_dir.keys())[0]
             directory += f"- {key}\n"
             for second_dir in first_dir[key]:
                 directory += f"  - {second_dir}\n"
-        self._init_actions(actions)
+        self.set_actions(actions)
+        self.rc.max_react_loop = len(self.actions)
+        return Message()
 
     async def _act(self) -> Message:
         """Perform an action as determined by the role.
@@ -77,8 +79,7 @@ class TutorialAssistant(Role):
             self.topic = msg.content
             resp = await todo.run(topic=self.topic)
             logger.info(resp)
-            await self._handle_directory(resp)
-            return await super().react()
+            return await self._handle_directory(resp)
         resp = await todo.run(topic=self.topic)
         logger.info(resp)
         if self.total_content != "":

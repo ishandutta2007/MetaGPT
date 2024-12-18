@@ -5,7 +5,7 @@
 @File    : write_review.py
 """
 import asyncio
-from typing import List
+from typing import List, Literal
 
 from metagpt.actions import Action
 from metagpt.actions.action_node import ActionNode
@@ -21,16 +21,15 @@ REVIEW = ActionNode(
     ],
 )
 
-LGTM = ActionNode(
-    key="LGTM",
-    expected_type=str,
-    instruction="LGTM/LBTM. If the code is fully implemented, "
-    "give a LGTM (Looks Good To Me), otherwise provide a LBTM (Looks Bad To Me).",
+REVIEW_RESULT = ActionNode(
+    key="ReviewResult",
+    expected_type=Literal["LGTM", "LBTM"],
+    instruction="LGTM/LBTM. If the code is fully implemented, " "give a LGTM, otherwise provide a LBTM.",
     example="LBTM",
 )
 
-ACTIONS = ActionNode(
-    key="Actions",
+NEXT_STEPS = ActionNode(
+    key="NextSteps",
     expected_type=str,
     instruction="Based on the code review outcome, suggest actionable steps. This can include code changes, "
     "refactoring suggestions, or any follow-up tasks.",
@@ -69,7 +68,7 @@ WRITE_DRAFT = ActionNode(
 )
 
 
-WRITE_MOVE_FUNCTION = ActionNode(
+WRITE_FUNCTION = ActionNode(
     key="WriteFunction",
     expected_type=str,
     instruction="write code for the function not implemented.",
@@ -140,7 +139,7 @@ Language: Please use the same language as the user requirement, but the title an
     end", "Anything UNCLEAR": "目前项目要求明确，没有不清楚的地方。"}
 
 ## Tasks
-{"Required Python packages": ["无需Python包"], "Required Other language third-party packages": ["vue.js"], "Logic Analysis": [["index.html", "作为游戏的入口文件和主要的HTML结构"], ["styles.css", "包含所有的CSS样式，确保游戏界面美观"], ["main.js", "包含Main类，负责初始化游戏和绑定事件"], ["game.js", "包含Game类，负责游戏逻辑，如开始游戏、移动方块等"], ["storage.js", "包含Storage类，用于获取和设置玩家的最高分"]], "Task list": ["index.html", "styles.css", "storage.js", "game.js", "main.js"], "Full API spec": "", "Shared Knowledge": "\'game.js\' 包含游戏逻辑相关的函数，被 \'main.js\' 调用。", "Anything UNCLEAR": "目前项目要求明确，没有不清楚的地方。"}
+{"Required packages": ["无需第三方包"], "Required Other language third-party packages": ["vue.js"], "Logic Analysis": [["index.html", "作为游戏的入口文件和主要的HTML结构"], ["styles.css", "包含所有的CSS样式，确保游戏界面美观"], ["main.js", "包含Main类，负责初始化游戏和绑定事件"], ["game.js", "包含Game类，负责游戏逻辑，如开始游戏、移动方块等"], ["storage.js", "包含Storage类，用于获取和设置玩家的最高分"]], "Task list": ["index.html", "styles.css", "storage.js", "game.js", "main.js"], "Full API spec": "", "Shared Knowledge": "\'game.js\' 包含游戏逻辑相关的函数，被 \'main.js\' 调用。", "Anything UNCLEAR": "目前项目要求明确，没有不清楚的地方。"}
 
 ## Code Files
 ----- index.html
@@ -555,8 +554,8 @@ LBTM
 """
 
 
-WRITE_CODE_NODE = ActionNode.from_children("WRITE_REVIEW_NODE", [REVIEW, LGTM, ACTIONS])
-WRITE_MOVE_NODE = ActionNode.from_children("WRITE_MOVE_NODE", [WRITE_DRAFT, WRITE_MOVE_FUNCTION])
+WRITE_CODE_NODE = ActionNode.from_children("WRITE_REVIEW_NODE", [REVIEW, REVIEW_RESULT, NEXT_STEPS])
+WRITE_MOVE_NODE = ActionNode.from_children("WRITE_MOVE_NODE", [WRITE_DRAFT, WRITE_FUNCTION])
 
 
 CR_FOR_MOVE_FUNCTION_BY_3 = """
@@ -579,8 +578,7 @@ class WriteCodeAN(Action):
 
     async def run(self, context):
         self.llm.system_prompt = "You are an outstanding engineer and can implement any code"
-        return await WRITE_MOVE_FUNCTION.fill(context=context, llm=self.llm, schema="json")
-        # return await WRITE_CODE_NODE.fill(context=context, llm=self.llm, schema="markdown")
+        return await WRITE_MOVE_NODE.fill(context=context, llm=self.llm, schema="json")
 
 
 async def main():

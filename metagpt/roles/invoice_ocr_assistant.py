@@ -60,7 +60,7 @@ class InvoiceOCRAssistant(Role):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._init_actions([InvoiceOCR])
+        self.set_actions([InvoiceOCR])
         self._set_react_mode(react_mode=RoleReactMode.BY_ORDER.value)
 
     async def _act(self) -> Message:
@@ -80,19 +80,17 @@ class InvoiceOCRAssistant(Role):
                 raise Exception("Invoice file not uploaded")
 
             resp = await todo.run(file_path)
+            actions = list(self.actions)
             if len(resp) == 1:
                 # Single file support for questioning based on OCR recognition results
-                self._init_actions([GenerateTable, ReplyQuestion])
+                actions.extend([GenerateTable, ReplyQuestion])
                 self.orc_data = resp[0]
             else:
-                self._init_actions([GenerateTable])
-
-            self.rc.todo = None
+                actions.append(GenerateTable)
+            self.set_actions(actions)
+            self.rc.max_react_loop = len(self.actions)
             content = INVOICE_OCR_SUCCESS
             resp = OCRResults(ocr_result=json.dumps(resp))
-            msg = Message(content=content, instruct_content=resp)
-            self.rc.memory.add(msg)
-            return await super().react()
         elif isinstance(todo, GenerateTable):
             ocr_results: OCRResults = msg.instruct_content
             resp = await todo.run(json.loads(ocr_results.ocr_result), self.filename)

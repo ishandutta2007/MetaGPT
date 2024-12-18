@@ -1,61 +1,55 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Desc   : the unittest of spark api
+"""
+用于讯飞星火SDK的测试用例
+文档：https://www.xfyun.cn/doc/spark/Web.html
+"""
+
+
+from typing import AsyncIterator, List
 
 import pytest
+from sparkai.core.messages.ai import AIMessage, AIMessageChunk
+from sparkai.core.outputs.chat_generation import ChatGeneration
+from sparkai.core.outputs.llm_result import LLMResult
 
-from metagpt.config import CONFIG
-from metagpt.provider.spark_api import GetMessageFromWeb, SparkLLM
+from metagpt.provider.spark_api import SparkLLM
+from tests.metagpt.provider.mock_llm_config import mock_llm_config_spark
+from tests.metagpt.provider.req_resp_const import (
+    llm_general_chat_funcs_test,
+    messages,
+    prompt,
+    resp_cont_tmpl,
+)
 
-CONFIG.spark_appid = "xxx"
-CONFIG.spark_api_secret = "xxx"
-CONFIG.spark_api_key = "xxx"
-CONFIG.domain = "xxxxxx"
-CONFIG.spark_url = "xxxx"
+resp_cont = resp_cont_tmpl.format(name="Spark")
+USAGE = {
+    "token_usage": {"question_tokens": 1000, "prompt_tokens": 1000, "completion_tokens": 1000, "total_tokens": 2000}
+}
+spark_agenerate_result = LLMResult(
+    generations=[[ChatGeneration(text=resp_cont, message=AIMessage(content=resp_cont, additional_kwargs=USAGE))]]
+)
 
-prompt_msg = "who are you"
-resp_content = "I'm Spark"
-
-
-class MockWebSocketApp(object):
-    def __init__(self, ws_url, on_message=None, on_error=None, on_close=None, on_open=None):
-        pass
-
-    def run_forever(self, sslopt=None):
-        pass
-
-
-def test_get_msg_from_web(mocker):
-    mocker.patch("websocket.WebSocketApp", MockWebSocketApp)
-
-    get_msg_from_web = GetMessageFromWeb(text=prompt_msg)
-    assert get_msg_from_web.gen_params()["parameter"]["chat"]["domain"] == "xxxxxx"
-
-    ret = get_msg_from_web.run()
-    assert ret == ""
+chunks = [AIMessageChunk(content=resp_cont), AIMessageChunk(content="", additional_kwargs=USAGE)]
 
 
-def mock_spark_get_msg_from_web_run(self) -> str:
-    return resp_content
+async def chunk_iterator(chunks: List[AIMessageChunk]) -> AsyncIterator[AIMessageChunk]:
+    for chunk in chunks:
+        yield chunk
+
+
+async def mock_spark_acreate(self, messages, stream):
+    if stream:
+        return chunk_iterator(chunks)
+    else:
+        return spark_agenerate_result
 
 
 @pytest.mark.asyncio
 async def test_spark_acompletion(mocker):
-    mocker.patch("metagpt.provider.spark_api.GetMessageFromWeb.run", mock_spark_get_msg_from_web_run)
+    mocker.patch("metagpt.provider.spark_api.SparkLLM.acreate", mock_spark_acreate)
 
-    spark_gpt = SparkLLM()
+    spark_llm = SparkLLM(mock_llm_config_spark)
 
-    resp = await spark_gpt.acompletion([])
-    assert resp == resp_content
+    resp = await spark_llm.acompletion([messages])
+    assert spark_llm.get_choice_text(resp) == resp_cont
 
-    resp = await spark_gpt.aask(prompt_msg, stream=False)
-    assert resp == resp_content
-
-    resp = await spark_gpt.acompletion_text([], stream=False)
-    assert resp == resp_content
-
-    resp = await spark_gpt.acompletion_text([], stream=True)
-    assert resp == resp_content
-
-    resp = await spark_gpt.aask(prompt_msg)
-    assert resp == resp_content
+    await llm_general_chat_funcs_test(spark_llm, prompt, messages, resp_cont)

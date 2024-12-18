@@ -6,8 +6,11 @@
 @File    : __init__.py
 """
 
-
 from enum import Enum
+from metagpt.tools import libs  # this registers all tools
+from metagpt.tools.tool_registry import TOOL_REGISTRY
+
+_ = libs, TOOL_REGISTRY  # Avoid pre-commit error
 
 
 class SearchEngineType(Enum):
@@ -16,6 +19,7 @@ class SearchEngineType(Enum):
     DIRECT_GOOGLE = "google"
     DUCK_DUCK_GO = "ddg"
     CUSTOM_ENGINE = "custom"
+    BING = "bing"
 
 
 class WebBrowserEngineType(Enum):
@@ -27,3 +31,8 @@ class WebBrowserEngineType(Enum):
     def __missing__(cls, key):
         """Default type conversion"""
         return cls.CUSTOM
+
+
+class SearchInterface:
+    async def asearch(self, *args, **kwargs):
+        ...

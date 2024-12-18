@@ -1,10 +1,15 @@
+import tempfile
 from pathlib import Path
 from random import random
 from tempfile import TemporaryDirectory
 
 import pytest
 
+from metagpt.actions.research import CollectLinks
 from metagpt.roles import researcher
+from metagpt.team import Team
+from metagpt.tools import SearchEngineType
+from metagpt.tools.search_engine import SearchEngine
 
 
 async def mock_llm_ask(self, prompt: str, system_msgs):
@@ -25,16 +30,20 @@ async def mock_llm_ask(self, prompt: str, system_msgs):
 
 
 @pytest.mark.asyncio
-async def test_researcher(mocker):
+async def test_researcher(mocker, search_engine_mocker, context):
     with TemporaryDirectory() as dirname:
         topic = "dataiku vs. datarobot"
         mocker.patch("metagpt.provider.base_llm.BaseLLM.aask", mock_llm_ask)
         researcher.RESEARCH_PATH = Path(dirname)
-        await researcher.Researcher().run(topic)
+        role = researcher.Researcher(context=context)
+        for i in role.actions:
+            if isinstance(i, CollectLinks):
+                i.search_engine = SearchEngine(engine=SearchEngineType.DUCK_DUCK_GO)
+        await role.run(topic)
         assert (researcher.RESEARCH_PATH / f"{topic}.md").read_text().startswith("# Research Report")
 
 
-def test_write_report(mocker):
+def test_write_report(mocker, context):
     with TemporaryDirectory() as dirname:
         for i, topic in enumerate(
             [
@@ -46,8 +55,16 @@ def test_write_report(mocker):
         ):
             researcher.RESEARCH_PATH = Path(dirname)
             content = "# Research Report"
-            researcher.Researcher().write_report(topic, content)
+            researcher.Researcher(context=context).write_report(topic, content)
             assert (researcher.RESEARCH_PATH / f"{i+1}. metagpt.md").read_text().startswith("# Research Report")
+
+
+@pytest.mark.asyncio
+async def test_serialize():
+    team = Team()
+    team.hire([researcher.Researcher()])
+    with tempfile.TemporaryDirectory() as dirname:
+        team.serialize(Path(dirname) / "team.json")
 
 
 if __name__ == "__main__":

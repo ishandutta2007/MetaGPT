@@ -1,10 +1,9 @@
-name: Python application test
+name: Unit Tests
 
 on:
-  workflow_dispatch:
   pull_request_target:
   push: 
-    branches: 
+    branches:
       - 'main'
       - 'dev'
       - '*-release'
@@ -12,7 +11,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment: unittest
     strategy:
       matrix:
         # python-version: ['3.9', '3.10', '3.11']
@@ -20,25 +18,32 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+        cache: 'pip'
     - name: Install dependencies
       run: |
-        sh tests/scripts/run_install_deps.sh
+        python -m pip install --upgrade pip
+        pip install -e .[test]
+        npm install -g @mermaid-js/mermaid-cli
+        playwright install --with-deps
     - name: Test with pytest
       run: |
-        echo "${{ secrets.METAGPT_KEY_YAML }}" | base64 -d > config/key.yaml
-        pytest tests/ --doctest-modules --cov=./metagpt/ --cov-report=xml:cov.xml --cov-report=html:htmlcov --durations=20 | tee unittest.txt
+        export ALLOW_OPENAI_API_CALL=0
+        mkdir -p ~/.metagpt && cp tests/config2.yaml ~/.metagpt/config2.yaml
+        pytest | tee unittest.txt
     - name: Show coverage report
       run: |
         coverage report -m
     - name: Show failed tests and overall summary
       run: |
-        grep -E "FAILED tests|[0-9]+ passed," unittest.txt
-        failed_count=$(grep "FAILED" unittest.txt | wc -l)
-        if [[ "$failed_count" -gt 0 ]]; then
+        grep -E "FAILED tests|ERROR tests|[0-9]+ passed," unittest.txt
+        failed_count=$(grep -E "FAILED tests|ERROR tests" unittest.txt | wc -l | tr -d '[:space:]')
+        if [[ $failed_count -gt 0 ]]; then
           echo "$failed_count failed lines found! Task failed."
           exit 1
         fi
