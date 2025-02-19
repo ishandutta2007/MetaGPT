@@ -1,7 +1,7 @@
 ### Python template
 
 # Byte-compiled / optimized / DLL files
-__pycache__/
+__pycache__
 *.py[cod]
 *$py.class
 
@@ -27,6 +27,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+metagpt/tools/schemas/
+examples/data/search_kb/*.json
 
 # PyInstaller
 #  Usually these files are written by a python scripts from a template
@@ -151,9 +153,14 @@ allure-results
 .vscode
 
 key.yaml
-data
+/data/
 data.ms
 examples/nb/
+examples/default__vector_store.json
+examples/docstore.json
+examples/graph_store.json
+examples/image__vector_store.json
+examples/index_store.json
 .chroma
 *~$*
 workspace/*
@@ -168,12 +175,23 @@ output
 tmp.png
 .dependencies.json
 tests/metagpt/utils/file_repo_git
+tests/data/rsp_cache_new.json
+tests/data/serdeser_storage/
 *.tmp
 *.png
 htmlcov
 htmlcov.*
+cov.xml
 *.dot
 *.pkl
+*.faiss
 *-structure.csv
 *-structure.json
+*.dot
+.python-version
+*.csv
+metagpt/ext/sela/results/*
+.chainlit/
 
+metagpt/ext/aflow/data
+metagpt/ext/aflow/scripts/optimized
